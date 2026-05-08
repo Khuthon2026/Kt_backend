@@ -3,9 +3,11 @@ from datetime import datetime, timedelta
 from typing import Any
 
 try:
-    from google_play_scraper import developer as gps_developer
+    import google_play_scraper as gps
 except ImportError:
     gps_developer = None
+else:
+    gps_developer = getattr(gps, "developer", None)
 
 
 async def fetch_developer_apps(dev_id: str, current_genre: str) -> dict[str, Any] | None:
