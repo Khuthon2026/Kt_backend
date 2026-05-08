@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(git push *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Read(//c/Users/kangk/AppData/Roaming/**)",
+      "Read(//c/Users/kangk/AppData/Local/Programs//**)",
+      "Bash(.venv/Scripts/uvicorn.exe main:app *)",
+      "Bash(/c/Develop/Khuthon2026/backend/.venv/Scripts/pip.exe install *)",
+      "Bash(/c/Develop/Khuthon2026/backend/.venv/Scripts/python.exe -m pip install sqlalchemy==2.0.36)",
+      "Bash(/c/Develop/Khuthon2026/backend/.venv/Scripts/python.exe -m ensurepip)",
+      "Bash(/c/Develop/Khuthon2026/backend/.venv/Scripts/uvicorn.exe main:app *)"
     ]
   }
 }
