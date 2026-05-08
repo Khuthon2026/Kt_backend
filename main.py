@@ -1,13 +1,18 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
 
+load_dotenv()
+
+import models  # Base에 테이블 등록
+from db import init_db
 from routers import health, score
 
 app = FastAPI(
     title="AdGap API",
     description="양산형 앱 광고 신뢰도 점수화 도구",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -20,6 +25,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def startup():
+    init_db()
 
 
 @app.exception_handler(Exception)

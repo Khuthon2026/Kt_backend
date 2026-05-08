@@ -1,15 +1,15 @@
 import re
 import asyncio
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import HTTPException
 from google_play_scraper import app as gps_app
 from google_play_scraper import reviews as gps_reviews
+from google_play_scraper import search as gps_search
 from google_play_scraper import Sort
 
 
 def extract_app_id(input_str: str) -> str:
-    """Play Store URL 또는 패키지명에서 app_id 추출"""
     match = re.search(r'id=([a-zA-Z0-9._]+)', input_str)
     if match:
         return match.group(1)
@@ -17,7 +17,7 @@ def extract_app_id(input_str: str) -> str:
 
 
 async def fetch_app_data(app_id: str) -> dict[str, Any]:
-    """google-play-scraper로 앱 정보/리뷰 조회 (동기 라이브러리를 async로 래핑)."""
+    """앱 정보 + 리뷰 200개 한 번에 조회."""
     loop = asyncio.get_running_loop()
 
     try:
@@ -62,4 +62,26 @@ async def fetch_app_data(app_id: str) -> dict[str, Any]:
         },
         "histogram": app_result.get("histogram") or {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
         "reviews": review_result or [],
+    }
+
+
+async def search_app(app_name: str) -> Optional[dict]:
+    """앱 이름으로 Play Store 검색 → 상위 1개 반환."""
+    loop = asyncio.get_running_loop()
+    results = await loop.run_in_executor(
+        None,
+        lambda: gps_search(app_name, lang="ko", country="kr", n_hits=5),
+    )
+    if not results:
+        return None
+    top = results[0]
+    return {
+        "google_play_id": top.get("appId", ""),
+        "name": top.get("title", ""),
+        "developer": top.get("developer", ""),
+        "icon_url": top.get("icon", ""),
+        "score": top.get("score") or 0.0,
+        "ratings_count": top.get("ratings") or 0,
+        "installs": top.get("installs", ""),
+        "category": top.get("genre", ""),
     }

@@ -20,7 +20,14 @@ class ErrorResponse(BaseModel):
 
 
 class AppAnalyzeRequest(BaseModel):
-    app_id: str  # com.example.app 또는 Play Store URL
+    app_name: str           # 앱 이름 (Play Store 검색용)
+    ad_url: Optional[str] = None  # YouTube 광고 URL (없으면 양산형 탐지만)
+
+
+class JobCreateResponse(BaseModel):
+    job_id: str
+    status: str
+    mode: str  # app_only / with_ad
 
 
 class ScoreBreakdown(BaseModel):
