@@ -12,4 +12,5 @@ async def search_apps(q: str = Query(..., min_length=0)) -> ApiResponse[SearchRe
         return ApiResponse(success=True, data=SearchResponse(results=[]))
 
     results = await play_scraper.fetch_search_results(q)
+    results = [r for r in results if r.get("google_play_id")]
     return ApiResponse(success=True, data=SearchResponse(results=results))
