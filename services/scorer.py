@@ -73,8 +73,8 @@ def select_top_reviews(reviews: list[dict[str, Any]]) -> dict[str, list[dict[str
         and any(word in _normalize_content(r.get("content", "")) for word in POSITIVE_KEYWORDS)
     ]
 
-    negative = _format_top_reviews(negative_candidates, limit=2)
-    positive = _format_top_reviews(positive_candidates, limit=2)
+    negative = _format_top_reviews(negative_candidates, limit=1)
+    positive = _format_top_reviews(positive_candidates, limit=1)
     return {"negative": negative, "positive": positive}
 
 
