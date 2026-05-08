@@ -73,8 +73,8 @@ def select_top_reviews(reviews: list[dict[str, Any]]) -> dict[str, list[dict[str
         and any(word in _normalize_content(r.get("content", "")) for word in POSITIVE_KEYWORDS)
     ]
 
-    negative = _format_top_reviews(negative_candidates, limit=1)
-    positive = _format_top_reviews(positive_candidates, limit=1)
+    negative = _format_top_reviews(negative_candidates, limit=2, keywords=NEGATIVE_KEYWORDS)
+    positive = _format_top_reviews(positive_candidates, limit=2, keywords=POSITIVE_KEYWORDS)
     return {"negative": negative, "positive": positive}
 
 
@@ -127,7 +127,11 @@ def _normalize_content(content: str) -> str:
     return (content or "").strip()
 
 
-def _format_top_reviews(reviews: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+def _format_top_reviews(
+    reviews: list[dict[str, Any]],
+    limit: int,
+    keywords: list[str] | None = None,
+) -> list[dict[str, Any]]:
     sorted_reviews = sorted(
         reviews,
         key=lambda r: len(_normalize_content(r.get("content", ""))),
@@ -135,10 +139,16 @@ def _format_top_reviews(reviews: list[dict[str, Any]], limit: int) -> list[dict[
     )
     formatted: list[dict[str, Any]] = []
     for review in sorted_reviews[:limit]:
+        content = _normalize_content(review.get("content", ""))
+        keyword_line = content
+        if keywords:
+            matched = [word for word in keywords if word in content]
+            if matched:
+                keyword_line = ", ".join(matched)
         formatted.append(
             {
                 "score": int(review.get("score") or 0),
-                "content": _normalize_content(review.get("content", "")),
+                "content": keyword_line,
                 "date": str(review.get("at", "")),
             }
         )
