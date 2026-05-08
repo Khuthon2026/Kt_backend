@@ -7,6 +7,9 @@
       "Bash(git -C \"c:/Khuthon_Backend\" add .claudeignore .claude/settings.json)",
       "Bash(git -C c:/Khuthon_Backend commit -m ' *)",
       "Bash(git -C \"c:/Khuthon_Backend\" push origin main)"
+    ],
+    "additionalDirectories": [
+      "C:\\Khuthon_Backend"
     ]
   }
 }
