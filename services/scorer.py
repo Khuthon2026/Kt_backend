@@ -62,14 +62,19 @@ def extract_keywords(reviews: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def select_top_reviews(reviews: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    negative = _format_top_reviews(
-        [r for r in reviews if (r.get("score") or 0) <= 2],
-        limit=3,
-    )
-    positive = _format_top_reviews(
-        [r for r in reviews if (r.get("score") or 0) >= 4],
-        limit=3,
-    )
+    negative_candidates = [
+        r for r in reviews
+        if (r.get("score") or 0) <= 2
+        and any(word in _normalize_content(r.get("content", "")) for word in NEGATIVE_KEYWORDS)
+    ]
+    positive_candidates = [
+        r for r in reviews
+        if (r.get("score") or 0) >= 4
+        and any(word in _normalize_content(r.get("content", "")) for word in POSITIVE_KEYWORDS)
+    ]
+
+    negative = _format_top_reviews(negative_candidates, limit=2)
+    positive = _format_top_reviews(positive_candidates, limit=2)
     return {"negative": negative, "positive": positive}
 
 
