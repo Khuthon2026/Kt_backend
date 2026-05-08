@@ -2,11 +2,17 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Any
 
-from google_play_scraper import developer as gps_developer
+try:
+    from google_play_scraper import developer as gps_developer
+except ImportError:
+    gps_developer = None
 
 
 async def fetch_developer_apps(dev_id: str, current_genre: str) -> dict[str, Any] | None:
     if not dev_id:
+        return None
+
+    if gps_developer is None:
         return None
 
     loop = asyncio.get_running_loop()
