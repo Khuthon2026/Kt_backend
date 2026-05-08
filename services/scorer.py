@@ -142,9 +142,7 @@ def _format_top_reviews(
         content = _normalize_content(review.get("content", ""))
         keyword_line = content
         if keywords:
-            matched = [word for word in keywords if word in content]
-            if matched:
-                keyword_line = ", ".join(matched)
+            keyword_line = _extract_keyword_sentence(content, keywords)
         formatted.append(
             {
                 "score": int(review.get("score") or 0),
@@ -153,3 +151,13 @@ def _format_top_reviews(
             }
         )
     return formatted
+
+
+def _extract_keyword_sentence(content: str, keywords: list[str]) -> str:
+    if not content:
+        return ""
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", content) if s.strip()]
+    for sentence in sentences:
+        if any(word in sentence for word in keywords):
+            return sentence
+    return content
