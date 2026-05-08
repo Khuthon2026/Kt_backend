@@ -8,6 +8,7 @@ from schemas import ScoreBreakdown
 NEGATIVE_KEYWORDS = [
     "광고와 다름", "광고랑 다름", "사기", "낚시", "다운받지 마",
     "환불", "거짓", "속았", "삭제", "별로", "최악", "쓰레기",
+    "낚였", "달라요", "다르다", "현질", "도박", "돈낭비",
 ]
 
 POSITIVE_KEYWORDS = [
@@ -15,7 +16,12 @@ POSITIVE_KEYWORDS = [
 ]
 
 
-async def calculate_score(app_info: dict[str, Any], histogram: dict[int, int], reviews: list[dict[str, Any]]) -> ScoreBreakdown:
+async def calculate_score(
+    app_info: dict[str, Any],
+    histogram: dict[int, int],
+    reviews: list[dict[str, Any]],
+    pattern_score: int | None = None,
+) -> ScoreBreakdown:
     avg_rating_score = _calc_avg_rating_score(app_info.get("score") or 0.0)
     polarization_score = _calc_polarization_score(histogram)
     negative_keyword_score = _calc_negative_keyword_score(reviews)
@@ -23,12 +29,15 @@ async def calculate_score(app_info: dict[str, Any], histogram: dict[int, int], r
         app_info.get("ratings") or 0,
         app_info.get("installs") or "0",
     )
+    # None = 개발자 데이터 없음 → 중립(50), 0~5 = 실제 패턴 점수
+    developer_pattern_score = 50.0 if pattern_score is None else (1 - pattern_score / 5) * 100
 
     overall = (
-        avg_rating_score * 0.25
-        + polarization_score * 0.30
-        + negative_keyword_score * 0.30
-        + review_ratio_score * 0.15
+        avg_rating_score * 0.05
+        + polarization_score * 0.50
+        + negative_keyword_score * 0.20
+        + review_ratio_score * 0.05
+        + developer_pattern_score * 0.20
     )
 
     return ScoreBreakdown(
@@ -107,7 +116,7 @@ def _calc_negative_keyword_score(reviews: list[dict[str, Any]]) -> float:
             hit_count += 1
 
     neg_ratio = hit_count / len(reviews)
-    return (1 - min(neg_ratio * 5, 1)) * 100
+    return (1 - min(neg_ratio * 10, 1)) * 100
 
 
 def _calc_review_ratio_score(ratings: int, installs: str) -> float:

@@ -40,17 +40,19 @@ async def run_analysis(job_id: str, google_play_id: str, ad_url: str | None = No
         reviews: list[dict[str, Any]] = scraped.get("reviews") or []
         histogram: dict[int, int] = scraped.get("histogram") or {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
 
-        job_store.update_job(job_id, progress=70, current_step="score_calc")
+        job_store.update_job(job_id, progress=65, current_step="developer_fetch")
+        dev_data = await developer.fetch_developer_apps(
+            dev_id=app_info_data.get("developer_id", ""),
+            current_genre=app_info_data.get("genre", ""),
+        )
+
+        job_store.update_job(job_id, progress=80, current_step="score_calc")
+        pattern_score: int | None = dev_data["pattern_score"] if dev_data else None
         score_breakdown = await scorer.calculate_score(
             app_info=app_info_data,
             histogram=histogram,
             reviews=reviews,
-        )
-
-        job_store.update_job(job_id, progress=85, current_step="developer_fetch")
-        dev_data = await developer.fetch_developer_apps(
-            dev_id=app_info_data.get("developer_id", ""),
-            current_genre=app_info_data.get("genre", ""),
+            pattern_score=pattern_score,
         )
 
         neg_hits = sum(
@@ -70,7 +72,7 @@ async def run_analysis(job_id: str, google_play_id: str, ad_url: str | None = No
         }
 
         top_reviews_data = select_top_reviews(reviews)
-        spam_score = round((100 - score_breakdown.overall) / 20, 1)
+        spam_score = min(round((100 - score_breakdown.overall) / 17, 1), 5.0)
 
         job = job_store.get_job(job_id)
         mode = job.mode if job else "app_only"
