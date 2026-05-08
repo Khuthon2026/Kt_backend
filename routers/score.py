@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from schemas import ApiResponse, AppAnalyzeRequest, AnalyzeResponse, AppInfo
+from schemas import ApiResponse, AppAnalyzeRequest, AnalyzeResponse, AppInfo, TopReviews, KeywordItem
 from services import play_scraper, scorer
 
 router = APIRouter(tags=["Score"])
@@ -10,33 +10,41 @@ async def analyze_app(request: AppAnalyzeRequest):
     app_id = play_scraper.extract_app_id(request.app_id)
 
     try:
-        app_data = await play_scraper.fetch_app_info(app_id)
-    except Exception as e:
+        scraped = await play_scraper.fetch_app_data(app_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(
-            status_code=404,
-            detail={"code": "APP_NOT_FOUND", "message": f"앱을 찾을 수 없습니다: {app_id}"},
-        )
+            status_code=502,
+            detail={"code": "SCRAPING_FAILED", "message": "스크래핑 중 오류가 발생했습니다"},
+        ) from exc
 
-    score_breakdown = scorer.calculate_score(app_data)
-    suspicious_keywords = scorer.find_suspicious_keywords(app_data["description"])
+    app_info_data = scraped["app"]
+    score_breakdown = scorer.calculate_score(
+        app_info=app_info_data,
+        histogram=scraped.get("histogram") or {},
+        reviews=scraped.get("reviews") or [],
+    )
     verdict = scorer.get_verdict(score_breakdown.overall)
+    keywords = scorer.extract_keywords(scraped.get("reviews") or [])
+    top_reviews = scorer.select_top_reviews(scraped.get("reviews") or [])
 
     return ApiResponse(
         success=True,
         data=AnalyzeResponse(
             app_id=app_id,
             app_info=AppInfo(
-                title=app_data["title"],
-                developer=app_data["developer"],
-                score=app_data["score"],
-                ratings=app_data["ratings"],
-                installs=app_data["installs"],
-                description=app_data["description"],
-                icon=app_data["icon"],
-                genre=app_data["genre"],
+                title=app_info_data.get("title", ""),
+                developer=app_info_data.get("developer", ""),
+                icon=app_info_data.get("icon", ""),
+                genre=app_info_data.get("genre", ""),
+                score=app_info_data.get("score") or 0.0,
+                ratings=app_info_data.get("ratings") or 0,
+                installs=app_info_data.get("installs") or "0",
             ),
             score_breakdown=score_breakdown,
-            suspicious_keywords=suspicious_keywords,
             verdict=verdict,
+            keywords=[KeywordItem(**item) for item in keywords],
+            top_reviews=TopReviews(**top_reviews),
         ),
     )
