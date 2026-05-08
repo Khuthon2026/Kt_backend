@@ -1,6 +1,11 @@
 import re
 import asyncio
+from typing import Any
+
+from fastapi import HTTPException
 from google_play_scraper import app as gps_app
+from google_play_scraper import reviews as gps_reviews
+from google_play_scraper import Sort
 
 
 def extract_app_id(input_str: str) -> str:
@@ -11,24 +16,49 @@ def extract_app_id(input_str: str) -> str:
     return input_str.strip()
 
 
-async def fetch_app_info(app_id: str) -> dict:
-    """google-play-scraper로 앱 정보 조회 (동기 라이브러리를 async로 래핑)"""
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(
-        None,
-        lambda: gps_app(app_id, lang="ko", country="kr"),
-    )
+async def fetch_app_data(app_id: str) -> dict[str, Any]:
+    """google-play-scraper로 앱 정보/리뷰 조회 (동기 라이브러리를 async로 래핑)."""
+    loop = asyncio.get_running_loop()
+
+    try:
+        app_result = await loop.run_in_executor(
+            None,
+            lambda: gps_app(app_id, lang="ko", country="kr"),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "APP_NOT_FOUND", "message": f"앱을 찾을 수 없습니다: {app_id}"},
+        ) from exc
+
+    try:
+        review_result, _ = await loop.run_in_executor(
+            None,
+            lambda: gps_reviews(
+                app_id,
+                lang="ko",
+                country="kr",
+                sort=Sort.NEWEST,
+                count=200,
+            ),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "SCRAPING_FAILED", "message": "스크래핑 중 오류가 발생했습니다"},
+        ) from exc
+
     return {
-        "title": result.get("title", ""),
-        "developer": result.get("developer", ""),
-        "score": result.get("score") or 0.0,
-        "ratings": result.get("ratings") or 0,
-        "installs": result.get("installs", "0"),
-        "description": result.get("description", ""),
-        "permissions": result.get("permissions") or [],
-        "genre": result.get("genre", ""),
-        "free": result.get("free", True),
-        "icon": result.get("icon", ""),
-        "screenshots": result.get("screenshots") or [],
-        "video": result.get("video"),  # 프로모션 영상 URL (있으면)
+        "app": {
+            "title": app_result.get("title", ""),
+            "developer": app_result.get("developer", ""),
+            "score": app_result.get("score") or 0.0,
+            "ratings": app_result.get("ratings") or 0,
+            "installs": app_result.get("installs", "0"),
+            "description": app_result.get("description", ""),
+            "genre": app_result.get("genre", ""),
+            "icon": app_result.get("icon", ""),
+        },
+        "histogram": app_result.get("histogram") or {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+        "reviews": review_result or [],
     }
