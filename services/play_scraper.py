@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import HTTPException
 from google_play_scraper import app as gps_app
+from google_play_scraper import search as gps_search
 from google_play_scraper import reviews as gps_reviews
 from google_play_scraper import Sort
 
@@ -63,3 +64,30 @@ async def fetch_app_data(app_id: str) -> dict[str, Any]:
         "histogram": app_result.get("histogram") or {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
         "reviews": review_result or [],
     }
+
+
+async def fetch_search_results(query: str) -> list[dict[str, Any]]:
+    """google-play-scraper 검색 결과를 async로 래핑."""
+    loop = asyncio.get_running_loop()
+
+    try:
+        results = await loop.run_in_executor(
+            None,
+            lambda: gps_search(query, lang="ko", country="kr", n_hits=3),
+        )
+    except Exception:
+        return []
+
+    if not results:
+        return []
+
+    return [
+        {
+            "google_play_id": item.get("appId", ""),
+            "title": item.get("title", ""),
+            "developer": item.get("developer", ""),
+            "icon": item.get("icon", ""),
+            "score": item.get("score") or 0.0,
+        }
+        for item in results
+    ]

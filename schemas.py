@@ -19,6 +19,18 @@ class ErrorResponse(BaseModel):
     error: ErrorDetail
 
 
+class SearchResultItem(BaseModel):
+    google_play_id: str
+    title: str
+    developer: str
+    icon: str
+    score: float
+
+
+class SearchResponse(BaseModel):
+    results: list[SearchResultItem]
+
+
 class AppAnalyzeRequest(BaseModel):
     app_id: str  # com.example.app 또는 Play Store URL
 
