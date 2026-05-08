@@ -1,0 +1,35 @@
+# Gradle 빌드 산출물
+.gradle/
+build/
+out/
+*.jar
+*.war
+*.class
+
+# Gradle Wrapper 바이너리
+gradle/wrapper/gradle-wrapper.jar
+
+# Git 내부 데이터
+.git/
+
+# 테스트 (해커톤 중 작성하지 않음)
+src/test/
+
+# IDE 설정
+.idea/
+*.iml
+.vscode/
+*.eclipse
+
+# OS 메타데이터
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log
+logs/
+
+# 환경 변수 / 시크릿
+*.env
+application-local.yml
+application-local.yaml

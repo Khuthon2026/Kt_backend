@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://gondola.proxy.rlwy.net:41499/railway
+    username: postgres
+    password: AwmVAkZdaUGVWcxApOhcCIcZqtbEHGEn
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true

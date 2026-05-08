@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:/Khuthon_Backend\" status)",
+      "Bash(git -C \"c:/Khuthon_Backend\" branch -a)",
+      "Bash(git -C \"c:/Khuthon_Backend\" log --oneline -5)",
+      "Bash(git -C \"c:/Khuthon_Backend\" add .claudeignore .claude/settings.json)",
+      "Bash(git -C c:/Khuthon_Backend commit -m ' *)",
+      "Bash(git -C \"c:/Khuthon_Backend\" push origin main)"
+    ]
+  }
+}
