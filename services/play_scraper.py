@@ -62,6 +62,8 @@ async def fetch_app_data(app_id: str) -> dict[str, Any]:
             "description": app_result.get("description", ""),
             "genre": app_result.get("genre", ""),
             "icon": app_result.get("icon", ""),
+            "header_image": app_result.get("headerImage") or "",
+            "screenshots": app_result.get("screenshots") or [],
         },
         "histogram": histogram,
         "reviews": review_result or [],

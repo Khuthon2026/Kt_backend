@@ -1,3 +1,4 @@
+import re
 import uuid
 from typing import Any
 
@@ -16,13 +17,26 @@ from services.scorer import NEGATIVE_KEYWORDS, extract_keywords, select_top_revi
 router = APIRouter(tags=["verify"])
 
 
-async def run_analysis(job_id: str, google_play_id: str) -> None:
+def _extract_youtube_thumbnail(url: str | None) -> str | None:
+    if not url:
+        return None
+    match = re.search(r'(?:v=|youtu\.be/|shorts/)([a-zA-Z0-9_-]{11})', url)
+    if match:
+        return f"https://img.youtube.com/vi/{match.group(1)}/hqdefault.jpg"
+    return None
+
+
+async def run_analysis(job_id: str, google_play_id: str, ad_url: str | None = None) -> None:
     try:
         job_store.update_job(job_id, status="processing", progress=10, current_step="store_fetch")
         scraped = await play_scraper.fetch_app_data(google_play_id)
 
         job_store.update_job(job_id, progress=40, current_step="review_crawl")
         app_info_data: dict[str, Any] = scraped["app"]
+        raw_screenshots: list[str] = app_info_data.get("screenshots") or []
+        header_image: str = app_info_data.get("header_image") or ""
+        screenshots: list[str] = (raw_screenshots[:5] if raw_screenshots else ([header_image] if header_image else []))
+        ad_thumbnail: str | None = _extract_youtube_thumbnail(ad_url)
         reviews: list[dict[str, Any]] = scraped.get("reviews") or []
         histogram: dict[int, int] = scraped.get("histogram") or {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
 
@@ -110,6 +124,8 @@ async def run_analysis(job_id: str, google_play_id: str) -> None:
                 }
                 for app in (dev_data["apps"] if dev_data else [])
             ],
+            "screenshots": screenshots,
+            "ad_thumbnail": ad_thumbnail,
         }
 
         job_store.update_job(job_id, status="done", progress=100, current_step="done", result=result)
@@ -126,7 +142,7 @@ async def create_verify_job(
     job_id = str(uuid.uuid4())
     mode = "with_ad" if request.ad_url else "app_only"
     job_store.create_job(job_id, mode)
-    background_tasks.add_task(run_analysis, job_id, request.google_play_id)
+    background_tasks.add_task(run_analysis, job_id, request.google_play_id, request.ad_url)
     return VerifyCreateResponse(job_id=job_id, status="pending", mode=mode)
 
 
