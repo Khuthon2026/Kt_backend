@@ -1,6 +1,8 @@
+import asyncio
+
 from fastapi import APIRouter, HTTPException
-from schemas import ApiResponse, AppAnalyzeRequest, AnalyzeResponse, AppInfo, TopReviews, KeywordItem
-from services import play_scraper, scorer
+from schemas import ApiResponse, AppAnalyzeRequest, AnalyzeResponse, AppInfo, TopReviews, KeywordItem, DeveloperApps
+from services import play_scraper, scorer, developer
 
 router = APIRouter(tags=["Score"])
 
@@ -20,14 +22,21 @@ async def analyze_app(request: AppAnalyzeRequest):
         ) from exc
 
     app_info_data = scraped["app"]
-    score_breakdown = scorer.calculate_score(
-        app_info=app_info_data,
-        histogram=scraped.get("histogram") or {},
-        reviews=scraped.get("reviews") or [],
+    reviews = scraped.get("reviews") or []
+    score_breakdown, developer_apps = await asyncio.gather(
+        scorer.calculate_score(
+            app_info=app_info_data,
+            histogram=scraped.get("histogram") or {},
+            reviews=reviews,
+        ),
+        developer.fetch_developer_apps(
+            dev_id=app_info_data.get("developer_id", ""),
+            current_genre=app_info_data.get("genre", ""),
+        ),
     )
     verdict = scorer.get_verdict(score_breakdown.overall)
-    keywords = scorer.extract_keywords(scraped.get("reviews") or [])
-    top_reviews = scorer.select_top_reviews(scraped.get("reviews") or [])
+    keywords = scorer.extract_keywords(reviews)
+    top_reviews = scorer.select_top_reviews(reviews)
 
     return ApiResponse(
         success=True,
@@ -36,6 +45,7 @@ async def analyze_app(request: AppAnalyzeRequest):
             app_info=AppInfo(
                 title=app_info_data.get("title", ""),
                 developer=app_info_data.get("developer", ""),
+                developer_id=app_info_data.get("developer_id", ""),
                 icon=app_info_data.get("icon", ""),
                 genre=app_info_data.get("genre", ""),
                 score=app_info_data.get("score") or 0.0,
@@ -46,5 +56,6 @@ async def analyze_app(request: AppAnalyzeRequest):
             verdict=verdict,
             keywords=[KeywordItem(**item) for item in keywords],
             top_reviews=TopReviews(**top_reviews),
+            developer_apps=DeveloperApps(**developer_apps) if developer_apps else None,
         ),
     )

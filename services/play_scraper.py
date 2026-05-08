@@ -52,6 +52,7 @@ async def fetch_app_data(app_id: str) -> dict[str, Any]:
         "app": {
             "title": app_result.get("title", ""),
             "developer": app_result.get("developer", ""),
+            "developer_id": app_result.get("developerId", ""),
             "score": app_result.get("score") or 0.0,
             "ratings": app_result.get("ratings") or 0,
             "installs": app_result.get("installs", "0"),

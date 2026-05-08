@@ -15,7 +15,7 @@ POSITIVE_KEYWORDS = [
 ]
 
 
-def calculate_score(app_info: dict[str, Any], histogram: dict[int, int], reviews: list[dict[str, Any]]) -> ScoreBreakdown:
+async def calculate_score(app_info: dict[str, Any], histogram: dict[int, int], reviews: list[dict[str, Any]]) -> ScoreBreakdown:
     avg_rating_score = _calc_avg_rating_score(app_info.get("score") or 0.0)
     polarization_score = _calc_polarization_score(histogram)
     negative_keyword_score = _calc_negative_keyword_score(reviews)

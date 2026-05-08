@@ -34,6 +34,7 @@ class ScoreBreakdown(BaseModel):
 class AppInfo(BaseModel):
     title: str
     developer: str
+    developer_id: str
     icon: str
     genre: str
     score: float
@@ -58,6 +59,22 @@ class TopReviews(BaseModel):
     positive: list[ReviewItem]
 
 
+class DeveloperAppItem(BaseModel):
+    name: str
+    google_play_id: str
+    genre: str
+    released_at: str
+
+
+class DeveloperApps(BaseModel):
+    developer_id: str
+    total_count: int
+    recent_3months_count: int
+    category_overlap: float
+    pattern_score: int
+    apps: list[DeveloperAppItem]
+
+
 class AnalyzeResponse(BaseModel):
     app_id: str
     app_info: AppInfo
@@ -65,3 +82,4 @@ class AnalyzeResponse(BaseModel):
     verdict: str  # "TRUSTED" | "SUSPICIOUS" | "SCAM"
     keywords: list[KeywordItem]
     top_reviews: TopReviews
+    developer_apps: Optional[DeveloperApps] = None
