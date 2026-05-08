@@ -97,11 +97,12 @@ async def fetch_search_results(query: str) -> list[dict[str, Any]]:
 
     return [
         {
-            "google_play_id": item.get("appId", ""),
-            "title": item.get("title", ""),
-            "developer": item.get("developer", ""),
-            "icon": item.get("icon", ""),
+            "google_play_id": item.get("appId") or "",
+            "title": item.get("title") or "",
+            "developer": item.get("developer") or "",
+            "icon": item.get("icon") or "",
             "score": item.get("score") or 0.0,
         }
         for item in results
+        if item.get("appId")
     ]
