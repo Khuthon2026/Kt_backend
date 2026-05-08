@@ -3,12 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from routers import health, score, search, verify
+from db import init_db
 
 app = FastAPI(
     title="AdGap API",
     description="양산형 앱 광고 신뢰도 점수화 도구",
     version="1.0.0",
 )
+
+
+@app.on_event("startup")
+async def startup_event() -> None:
+    await init_db()
 
 app.add_middleware(
     CORSMiddleware,

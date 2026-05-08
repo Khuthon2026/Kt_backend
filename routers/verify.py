@@ -11,7 +11,7 @@ from schemas import (
     VerifyStatusResponse,
     VerifyResultResponse,
 )
-from services import play_scraper, scorer, developer
+from services import play_scraper, scorer, developer, review_store
 from services.scorer import NEGATIVE_KEYWORDS, extract_keywords, select_top_reviews
 
 router = APIRouter(tags=["verify"])
@@ -29,30 +29,34 @@ def _extract_youtube_thumbnail(url: str | None) -> str | None:
 async def run_analysis(job_id: str, google_play_id: str, ad_url: str | None = None) -> None:
     try:
         job_store.update_job(job_id, status="processing", progress=10, current_step="store_fetch")
-        scraped = await play_scraper.fetch_app_data(google_play_id)
+        scraped = await review_store.fetch_app_data_from_db(google_play_id)
+        if not scraped:
+            scraped = await play_scraper.fetch_app_data(google_play_id)
 
         job_store.update_job(job_id, progress=40, current_step="review_crawl")
         app_info_data: dict[str, Any] = scraped["app"]
+        app_info_data["google_play_id"] = google_play_id
         raw_screenshots: list[str] = app_info_data.get("screenshots") or []
         header_image: str = app_info_data.get("header_image") or ""
         screenshots: list[str] = (raw_screenshots[:5] if raw_screenshots else ([header_image] if header_image else []))
         ad_thumbnail: str | None = _extract_youtube_thumbnail(ad_url)
         reviews: list[dict[str, Any]] = scraped.get("reviews") or []
+        low_reviews: list[dict[str, Any]] = scraped.get("low_reviews") or []
         histogram: dict[int, int] = scraped.get("histogram") or {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
 
-        job_store.update_job(job_id, progress=65, current_step="developer_fetch")
+        job_store.update_job(job_id, progress=70, current_step="developer_fetch")
         dev_data = await developer.fetch_developer_apps(
             dev_id=app_info_data.get("developer_id", ""),
             current_genre=app_info_data.get("genre", ""),
         )
 
-        job_store.update_job(job_id, progress=80, current_step="score_calc")
-        pattern_score: int | None = dev_data["pattern_score"] if dev_data else None
+        job_store.update_job(job_id, progress=85, current_step="score_calc")
         score_breakdown = await scorer.calculate_score(
             app_info=app_info_data,
             histogram=histogram,
             reviews=reviews,
-            pattern_score=pattern_score,
+            pattern_score=dev_data["pattern_score"] if dev_data else None,
+            low_reviews=low_reviews,
         )
 
         neg_hits = sum(
@@ -81,7 +85,14 @@ async def run_analysis(job_id: str, google_play_id: str, ad_url: str | None = No
         }
 
         top_reviews_data = select_top_reviews(reviews)
-        spam_score = min(round((100 - score_breakdown.overall) / 17, 1), 5.0)
+        spam_score = (100 - score_breakdown.overall) / 20
+        if scorer.is_game_app(
+            title=app_info_data.get("title") or "",
+            developer=app_info_data.get("developer") or "",
+            app_id=google_play_id,
+        ):
+            spam_score += 0.8
+        spam_score = round(min(spam_score, 5.0), 2)
 
         job = job_store.get_job(job_id)
         mode = job.mode if job else "app_only"

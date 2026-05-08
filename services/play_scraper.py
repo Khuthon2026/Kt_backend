@@ -39,7 +39,7 @@ async def fetch_app_data(app_id: str) -> dict[str, Any]:
                 app_id,
                 lang="ko",
                 country="kr",
-                sort=Sort.NEWEST,
+                sort=Sort.MOST_RELEVANT,
                 count=200,
             ),
         )
@@ -48,6 +48,22 @@ async def fetch_app_data(app_id: str) -> dict[str, Any]:
             status_code=502,
             detail={"code": "SCRAPING_FAILED", "message": "스크래핑 중 오류가 발생했습니다"},
         ) from exc
+
+    # 1점 리뷰를 별도로 수집해 광고 기만 탐지 정밀도 향상
+    try:
+        low_review_result, _ = await loop.run_in_executor(
+            None,
+            lambda: gps_reviews(
+                app_id,
+                lang="ko",
+                country="kr",
+                sort=Sort.MOST_RELEVANT,
+                count=100,
+                filter_score_with=1,
+            ),
+        )
+    except Exception:
+        low_review_result = []
 
     histogram = _normalize_histogram(app_result.get("histogram"))
 
@@ -67,6 +83,7 @@ async def fetch_app_data(app_id: str) -> dict[str, Any]:
         },
         "histogram": histogram,
         "reviews": review_result or [],
+        "low_reviews": low_review_result or [],
     }
 
 
