@@ -8,7 +8,7 @@
 ## 프로젝트 개요
 
 - **목적**: 해커톤 백엔드 프로젝트
-- **주제**: AdGap — 양산형 앱 광고 신뢰도 점수화 도구
+- **주제**: AdGap (De Clone) — 양산형 앱 광고 신뢰도 점수화 도구
 - **개발 기간**: 해커톤 당일 (단기 집중 개발)
 - **팀 규모**: 4명 (BE 2, FE 2)
 
@@ -18,32 +18,31 @@
 
 | 분류 | 기술 |
 |------|------|
-| Framework | Spring Boot 4.0.6 |
-| Language | Java 21 |
-| ORM | Spring Data JPA + Hibernate |
-| Database | (미정 - 클라우드 DB 사용 예정) |
-| 빌드 | Gradle |
+| Framework | FastAPI |
+| Language | Python 3.11 |
+| 앱 스크래핑 | google-play-scraper |
+| 영상 분석 | yt-dlp |
+| 유효성 검사 | Pydantic v2 |
 | 배포 | Railway (GitHub main 브랜치 자동 배포) |
-| API 문서 | Swagger (springdoc-openapi) |
+| API 문서 | Swagger UI (FastAPI 자동 생성 — `/docs`) |
 
 ---
 
-## 아키텍처
-
-**계층형 아키텍처 (Layered Architecture)** 사용
-헥사고날, DDD 등 복잡한 아키텍처는 해커톤 범위에서 적용하지 않습니다.
+## 프로젝트 구조
 
 ```
-com.{팀명}.{프로젝트명}
-├── controller/       # API 엔드포인트, 요청/응답 처리
-├── service/          # 비즈니스 로직
-├── repository/       # DB 접근 (JPA Repository)
-├── domain/
-│   ├── entity/       # JPA Entity
-│   └── dto/          # Request / Response DTO
-├── config/           # Security, Swagger, CORS 등 설정
-├── exception/        # 커스텀 예외, 전역 예외 처리
-└── util/             # 유틸 클래스
+/
+├── main.py              # FastAPI 앱 진입점, CORS, 전역 예외 처리
+├── schemas.py           # Pydantic DTO (ApiResponse 래퍼 포함)
+├── routers/
+│   ├── health.py        # GET /health
+│   └── score.py         # POST /api/analyze
+├── services/
+│   ├── play_scraper.py  # google-play-scraper 연동, app_id 파싱
+│   └── scorer.py        # 신뢰도 점수 계산 로직
+├── requirements.txt
+├── runtime.txt          # python-3.11 (Railway 감지용)
+└── Procfile             # uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
 
 ---
@@ -51,82 +50,64 @@ com.{팀명}.{프로젝트명}
 ## 코드 컨벤션
 
 ### 네이밍
-- **클래스**: PascalCase → `UserController`, `UserService`
-- **메서드/변수**: camelCase → `getUserById`, `userName`
-- **상수**: UPPER_SNAKE_CASE → `JWT_SECRET_KEY`
-- **패키지**: 소문자 → `com.teamname.project.controller`
+- **파일/모듈**: snake_case → `play_scraper.py`, `score.py`
+- **함수/변수**: snake_case → `get_app_info`, `app_id`
+- **클래스**: PascalCase → `AppAnalyzeRequest`, `ScoreBreakdown`
+- **상수**: UPPER_SNAKE_CASE → `SUSPICIOUS_KEYWORDS`, `DANGEROUS_PERMISSIONS`
 
-### Controller
-- URL은 소문자 + 하이픈 → `/api/user-profiles`
+### Router
+- URL은 소문자 + 하이픈 → `/api/analyze`, `/api/app-score`
 - RESTful 규칙 준수 (GET/POST/PUT/DELETE)
-- 비즈니스 로직은 Controller에 작성하지 않음
-- 응답은 공통 `ApiResponse<T>` 래퍼 클래스 사용
+- 비즈니스 로직은 Router에 작성하지 않음 — `services/`로 위임
 
-```java
-// ✅ Good
-@RestController
-@RequestMapping("/api/users")
-@RequiredArgsConstructor
-public class UserController {
-
-    private final UserService userService;
-
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<UserResponse>> getUser(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(userService.getUser(id)));
-    }
-}
+```python
+# ✅ Good
+@router.post("/analyze", response_model=ApiResponse[AnalyzeResponse])
+async def analyze_app(request: AppAnalyzeRequest):
+    app_data = await play_scraper.fetch_app_info(request.app_id)
+    return ApiResponse(success=True, data=scorer.calculate_score(app_data))
 ```
 
 ### Service
-- 하나의 메서드는 하나의 책임만
-- `@Transactional` 적절히 사용 (조회는 `readOnly = true`)
+- 하나의 함수는 하나의 책임만
+- 동기 라이브러리(google-play-scraper 등)는 `asyncio.get_event_loop().run_in_executor`로 래핑
 
-```java
-// ✅ Good
-@Service
-@RequiredArgsConstructor
-public class UserService {
-
-    private final UserRepository userRepository;
-
-    @Transactional(readOnly = true)
-    public UserResponse getUser(Long id) {
-        User user = userRepository.findById(id)
-            .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        return UserResponse.from(user);
-    }
-}
+```python
+# ✅ Good
+async def fetch_app_info(app_id: str) -> dict:
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, lambda: gps_app(app_id, lang="ko", country="kr"))
+    return result
 ```
 
-### DTO
-- Request / Response DTO 분리
-- Entity를 직접 반환하지 않음 (DTO로 변환 필수)
-- 변환 메서드는 DTO 내부에 정적 팩토리 메서드로 작성
+### DTO (Pydantic)
+- Request / Response 스키마 분리
+- 모든 스키마는 `schemas.py`에서 관리
+- 공통 응답은 `ApiResponse[T]` Generic으로 래핑
 
-```java
-// ✅ Good
-public record UserResponse(Long id, String name, String email) {
-    public static UserResponse from(User user) {
-        return new UserResponse(user.getId(), user.getName(), user.getEmail());
-    }
-}
+```python
+# ✅ Good
+class AppAnalyzeRequest(BaseModel):
+    app_id: str  # com.example.app 또는 Play Store URL
+
+class AnalyzeResponse(BaseModel):
+    app_id: str
+    app_info: AppInfo
+    score_breakdown: ScoreBreakdown
+    suspicious_keywords: list[str]
+    verdict: str  # "TRUSTED" | "SUSPICIOUS" | "SCAM"
 ```
 
 ### 예외 처리
-- 커스텀 예외는 `CustomException` 하나로 통일, `ErrorCode` enum으로 관리
-- `@RestControllerAdvice`로 전역 처리
+- `HTTPException`으로 클라이언트 오류 처리
+- `main.py`의 `global_exception_handler`가 500 에러 공통 처리
 
-```java
-// ErrorCode.java
-@Getter
-@RequiredArgsConstructor
-public enum ErrorCode {
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
-
-    private final HttpStatus status;
-    private final String message;
-}
+```python
+# ✅ Good
+raise HTTPException(
+    status_code=404,
+    detail={"code": "APP_NOT_FOUND", "message": f"앱을 찾을 수 없습니다: {app_id}"},
+)
 ```
 
 ### 공통 응답 형식
@@ -143,34 +124,70 @@ public enum ErrorCode {
 {
   "success": false,
   "error": {
-    "code": "USER_NOT_FOUND",
-    "message": "사용자를 찾을 수 없습니다."
+    "code": "APP_NOT_FOUND",
+    "message": "앱을 찾을 수 없습니다."
   }
 }
 ```
 
 ---
 
-## 버전 관리
+## 핵심 API
 
-- 의존성 버전은 `build.gradle` 상단 `ext` 블록에 변수로 고정
-- 임의로 버전 올리지 않음, 변경 시 팀원과 합의 후 수정
+### `POST /api/analyze`
+앱 패키지명 또는 Play Store URL을 받아 신뢰도 점수를 반환합니다.
 
-```groovy
-// build.gradle
-ext {
-    swaggerVersion = '2.3.0'
+```json
+// Request
+{ "app_id": "com.example.app" }
+
+// Response
+{
+  "success": true,
+  "data": {
+    "app_id": "com.example.app",
+    "app_info": {
+      "title": "앱 이름",
+      "developer": "개발사",
+      "score": 4.2,
+      "ratings": 15000,
+      "installs": "1,000,000+",
+      "description": "...",
+      "icon": "https://...",
+      "genre": "도구"
+    },
+    "score_breakdown": {
+      "store_score": 78.4,
+      "permission_score": 70.0,
+      "keyword_score": 45.0,
+      "overall": 66.2
+    },
+    "suspicious_keywords": ["무료", "선착순"],
+    "verdict": "SUSPICIOUS"
+  }
 }
 ```
+
+**verdict 기준**
+| overall 점수 | verdict |
+|---|---|
+| 70 이상 | `TRUSTED` |
+| 40 ~ 69 | `SUSPICIOUS` |
+| 39 이하 | `SCAM` |
+
+---
+
+## 버전 관리
+
+- 의존성 버전은 `requirements.txt`에 고정
+- 임의로 버전 올리지 않음, 변경 시 팀원과 합의 후 수정
 
 ---
 
 ## 테스트 정책
 
 - 해커톤 기간 중 단위 테스트 작성은 하지 않음
-- 빠른 빌드 확인 (테스트 제외): `./gradlew build -x test`
-- API 동작 확인은 **Swagger UI로 수동 테스트**
-- 배포 전 최소 1회 전체 빌드 확인 권장: `./gradlew build`
+- API 동작 확인은 **Swagger UI (`/docs`)로 수동 테스트**
 
 ---
 
@@ -194,37 +211,32 @@ dev          ← 통합 브랜치 (PR 후 머지)
 
 - **플랫폼**: Railway
 - **자동 배포**: `main` 브랜치 push 시 자동 배포
-- **환경변수**: Railway 대시보드에서 관리 (로컬 `application-local.yml` 사용)
-- **포트**: `8080`
+- **Python 버전**: `runtime.txt`에 `python-3.11` 명시
+- **시작 명령**: `Procfile` — `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- **환경변수**: Railway 대시보드에서 관리, 로컬은 `.env` 파일 사용 (gitignore 처리)
 
-### 환경 분리
-```
-application.yml          # 공통 설정
-application-local.yml    # 로컬 개발용 (gitignore 처리)
-application-prod.yml     # 운영 환경 (Railway 환경변수로 주입)
-```
+### Railway 주의사항
+- 기존 Java 빌드팩이 잡혀 있으면 **Settings > Build > Python 빌드팩으로 수동 변경** 필요
+- `requirements.txt`가 루트에 있으면 Railway가 자동 감지함
 
 ---
 
 ## CORS 설정
 
-프론트엔드 Vercel 도메인에 대해 CORS를 허용합니다.
-로컬 개발 시 `http://localhost:3000`도 허용.
+`main.py`의 `CORSMiddleware`에서 관리.
+Vercel 도메인 확정 시 `allow_origins`에 실제 URL 추가.
 
-```java
-@Configuration
-public class CorsConfig implements WebMvcConfigurer {
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-            .allowedOrigins(
-                "http://localhost:3000",
-                "https://{vercel-domain}.vercel.app"  // 실제 도메인으로 교체
-            )
-            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-            .allowCredentials(true);
-    }
-}
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://{실제-vercel-도메인}.vercel.app",  # 확정 시 교체
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 ```
 
 ---
@@ -232,15 +244,13 @@ public class CorsConfig implements WebMvcConfigurer {
 ## 해커톤 필수 주의사항
 
 ### 하지 말아야 할 것 ❌
-- 헥사고날 아키텍처, DDD, MSA 등 복잡한 설계 패턴 도입
+- 복잡한 설계 패턴 도입 (추상화, 인터페이스 분리 등)
 - Docker / 컨테이너 환경 구성 (Railway가 알아서 처리)
-- 인터페이스를 구현체가 하나인데 억지로 분리
-- 지나친 추상화 (지금 당장 쓰이지 않는 코드 작성 금지)
-- 성능 최적화 (캐싱, 쿼리 튜닝 등) — MVP 완성 후에 고민
-- Lombok 없이 보일러플레이트 코드 수동 작성
+- 지금 당장 쓰이지 않는 코드 작성
+- 성능 최적화 (캐싱, 비동기 큐 등) — MVP 완성 후에 고민
 
 ### 우선순위 ✅
-1. 핵심 API 엔드포인트 동작 여부
+1. `POST /api/analyze` 동작 여부
 2. 프론트엔드 연동 완료
 3. 예외 처리 기본 세팅
 4. 나머지 디테일
@@ -250,33 +260,29 @@ public class CorsConfig implements WebMvcConfigurer {
 ## 자주 쓰는 명령어
 
 ```bash
-# 빌드
-./gradlew build
+# 의존성 설치
+pip install -r requirements.txt
 
-# 빌드 (테스트 제외 — 해커톤 중 빠른 빌드용)
-./gradlew build -x test
+# 로컬 실행 (hot reload)
+uvicorn main:app --reload
 
-# 로컬 실행
-./gradlew bootRun --args='--spring.profiles.active=local'
-
-# 의존성 확인
-./gradlew dependencies
+# 로컬 실행 (포트 지정)
+uvicorn main:app --reload --port 8000
 ```
 
 ---
 
 ## API 문서
 
-- 로컬: `http://localhost:8080/swagger-ui.html`
-- 배포: `https://{railway-domain}/swagger-ui.html`
-- API 변경 시 Swagger 어노테이션 업데이트 필수
+- 로컬: `http://localhost:8000/docs`
+- 배포: `https://{railway-domain}/docs`
 
 ---
 
 ## 참고
 
 - 프론트엔드 레포: `team-frontend`
-- API 명세: Swagger 또는 Notion 참고
+- API 명세: Swagger (`/docs`) 또는 Notion 참고
 - 디자인 시안: Figma 링크 (추후 업데이트)
 - 문의: GitHub Issues 또는 Discord
 
