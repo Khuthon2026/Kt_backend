@@ -30,6 +30,13 @@ class JobCreateResponse(BaseModel):
     mode: str  # app_only / with_ad
 
 
+class JobStatusResponse(BaseModel):
+    job_id: str
+    status: str          # pending / processing / done / failed
+    progress: int        # 0~100
+    current_step: Optional[str] = None  # youtube_fetch / store_match / review_crawl / score_calc
+
+
 class ScoreBreakdown(BaseModel):
     avg_rating_score: float        # 평균 평점 기반 (0~100)
     polarization_score: float      # ★1+★5 비율 역산
