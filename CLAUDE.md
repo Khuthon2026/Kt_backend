@@ -8,9 +8,9 @@
 ## 프로젝트 개요
 
 - **목적**: 해커톤 백엔드 프로젝트
-- **주제**: 미정 (확정 시 Agent.md에 추가 예정)
+- **주제**: AdGap — 양산형 앱 광고 신뢰도 점수화 도구
 - **개발 기간**: 해커톤 당일 (단기 집중 개발)
-- **팀 규모**: 4명
+- **팀 규모**: 4명 (BE 2, FE 2)
 
 ---
 
@@ -22,7 +22,6 @@
 | Language | Java 21 |
 | ORM | Spring Data JPA + Hibernate |
 | Database | (미정 - 클라우드 DB 사용 예정) |
-| 인증 | Spring Security + JWT |
 | 빌드 | Gradle |
 | 배포 | Railway (GitHub main 브랜치 자동 배포) |
 | API 문서 | Swagger (springdoc-openapi) |
@@ -123,8 +122,7 @@ public record UserResponse(Long id, String name, String email) {
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode {
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
-    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다.");
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
@@ -161,7 +159,6 @@ public enum ErrorCode {
 ```groovy
 // build.gradle
 ext {
-    jwtVersion = '0.11.5'
     swaggerVersion = '2.3.0'
 }
 ```
