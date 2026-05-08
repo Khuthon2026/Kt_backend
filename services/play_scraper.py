@@ -82,12 +82,13 @@ def _normalize_histogram(raw: Any) -> dict[int, int]:
 
 async def fetch_search_results(query: str) -> list[dict[str, Any]]:
     """google-play-scraper 검색 결과를 async로 래핑."""
+    normalized_query = _normalize_search_text(query)
     loop = asyncio.get_running_loop()
 
     try:
         results = await loop.run_in_executor(
             None,
-            lambda: gps_search(query, lang="ko", country="kr", n_hits=3),
+            lambda: gps_search(query, lang="ko", country="kr", n_hits=20),
         )
     except Exception:
         return []
@@ -95,7 +96,7 @@ async def fetch_search_results(query: str) -> list[dict[str, Any]]:
     if not results:
         return []
 
-    return [
+    items = [
         {
             "google_play_id": item.get("appId") or "",
             "title": item.get("title") or "",
@@ -106,3 +107,15 @@ async def fetch_search_results(query: str) -> list[dict[str, Any]]:
         for item in results
         if item.get("appId")
     ]
+
+    filtered = [
+        item
+        for item in items
+        if _normalize_search_text(item.get("title", "")).startswith(normalized_query)
+    ]
+
+    return filtered[:3]
+
+
+def _normalize_search_text(text: str) -> str:
+    return re.sub(r"\s+", "", text or "").lower().strip()
