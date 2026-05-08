@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from routers import health, score, search
+from routers import health, score, search, verify
 
 app = FastAPI(
     title="AdGap API",
@@ -48,3 +48,4 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 app.include_router(health.router)
 app.include_router(score.router, prefix="/api")
 app.include_router(search.router, prefix="/api", tags=["search"])
+app.include_router(verify.router, prefix="/api", tags=["verify"])

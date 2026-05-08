@@ -95,3 +95,77 @@ class AnalyzeResponse(BaseModel):
     keywords: list[KeywordItem]
     top_reviews: TopReviews
     developer_apps: Optional[DeveloperApps] = None
+
+
+# --- Verify API 스키마 ---
+
+class VerifyRequest(BaseModel):
+    google_play_id: str
+    ad_url: str | None = None
+
+
+class VerifyCreateResponse(BaseModel):
+    job_id: str
+    status: str
+    mode: str
+
+
+class VerifyStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: int
+    current_step: str
+
+
+class VerifyAppInfo(BaseModel):
+    name: str
+    developer: str
+    google_play_id: str
+    icon_url: str
+    category: str
+
+
+class VerifyRatings(BaseModel):
+    google_play: float
+
+
+class ReviewStats(BaseModel):
+    negative_ratio: float
+    polarization_index: float
+    trust_keywords: dict[str, int]
+
+
+class VerifyReviewItem(BaseModel):
+    score: int
+    text: str
+    date: str
+
+
+class VerifyReviews(BaseModel):
+    negative: list[VerifyReviewItem]
+    positive: list[VerifyReviewItem]
+
+
+class DeveloperStats(BaseModel):
+    app_count: int
+    category_overlap: float
+    pattern_score: int
+
+
+class VerifyDeveloperAppItem(BaseModel):
+    name: str
+    google_play_id: str
+    released_at: str
+
+
+class VerifyResultResponse(BaseModel):
+    job_id: str
+    mode: str
+    spam_score: float
+    ad_score: float | None
+    app: VerifyAppInfo
+    ratings: VerifyRatings
+    review_stats: ReviewStats
+    reviews: VerifyReviews
+    developer_stats: DeveloperStats
+    developer_apps: list[VerifyDeveloperAppItem]
