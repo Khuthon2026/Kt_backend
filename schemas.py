@@ -163,6 +163,7 @@ class VerifyResultResponse(BaseModel):
     mode: str
     spam_score: float
     ad_score: float | None
+    signal_scores: dict[str, float]
     app: VerifyAppInfo
     ratings: VerifyRatings
     review_stats: ReviewStats

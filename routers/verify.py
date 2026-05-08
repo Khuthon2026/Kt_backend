@@ -66,6 +66,12 @@ async def run_analysis(job_id: str, google_play_id: str) -> None:
             "mode": mode,
             "spam_score": spam_score,
             "ad_score": None,
+            "signal_scores": {
+                "avg_rating_score": score_breakdown.avg_rating_score,
+                "polarization_score": score_breakdown.polarization_score,
+                "negative_keyword_score": score_breakdown.negative_keyword_score,
+                "review_ratio_score": score_breakdown.review_ratio_score,
+            },
             "app": {
                 "name": app_info_data.get("title", ""),
                 "developer": app_info_data.get("developer", ""),
