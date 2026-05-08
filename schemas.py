@@ -132,7 +132,7 @@ class VerifyRatings(BaseModel):
 class ReviewStats(BaseModel):
     negative_ratio: float
     polarization_index: float
-    trust_keywords: dict[str, int]
+    trust_keywords: dict[str, dict[str, int]]
 
 
 class VerifyReviewItem(BaseModel):

@@ -65,8 +65,17 @@ async def run_analysis(job_id: str, google_play_id: str, ad_url: str | None = No
         )
 
         all_keywords = extract_keywords(reviews)
-        trust_keywords: dict[str, int] = {
-            k["word"]: k["count"] for k in all_keywords
+        trust_keywords: dict[str, dict[str, int]] = {
+            "positive": {
+                k["word"]: k["count"]
+                for k in all_keywords
+                if k["sentiment"] == "positive"
+            },
+            "negative": {
+                k["word"]: k["count"]
+                for k in all_keywords
+                if k["sentiment"] == "negative"
+            },
         }
 
         top_reviews_data = select_top_reviews(reviews)
