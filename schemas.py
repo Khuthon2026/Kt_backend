@@ -170,3 +170,5 @@ class VerifyResultResponse(BaseModel):
     reviews: VerifyReviews
     developer_stats: DeveloperStats
     developer_apps: list[VerifyDeveloperAppItem]
+    screenshots: list[str] = []
+    ad_thumbnail: str | None = None
