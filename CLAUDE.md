@@ -21,10 +21,11 @@
 | Framework | FastAPI |
 | Language | Python 3.11 |
 | 앱 스크래핑 | google-play-scraper |
-| 영상 분석 | yt-dlp |
 | 유효성 검사 | Pydantic v2 |
 | 배포 | Railway (GitHub main 브랜치 자동 배포) |
 | API 문서 | Swagger UI (FastAPI 자동 생성 — `/docs`) |
+
+> yt-dlp (YouTube URL 파싱)는 MVP 범위 제외. 시간 남으면 `services/youtube_parser.py`로 추가.
 
 ---
 
@@ -50,10 +51,10 @@
 ## 코드 컨벤션
 
 ### 네이밍
-- **파일/모듈**: snake_case → `play_scraper.py`, `score.py`
+- **파일/모듈**: snake_case → `play_scraper.py`, `scorer.py`
 - **함수/변수**: snake_case → `get_app_info`, `app_id`
 - **클래스**: PascalCase → `AppAnalyzeRequest`, `ScoreBreakdown`
-- **상수**: UPPER_SNAKE_CASE → `SUSPICIOUS_KEYWORDS`, `DANGEROUS_PERMISSIONS`
+- **상수**: UPPER_SNAKE_CASE → `SUSPICIOUS_KEYWORDS`, `SCORE_WEIGHTS`
 
 ### Router
 - URL은 소문자 + 하이픈 → `/api/analyze`, `/api/app-score`
@@ -70,13 +71,16 @@ async def analyze_app(request: AppAnalyzeRequest):
 
 ### Service
 - 하나의 함수는 하나의 책임만
-- 동기 라이브러리(google-play-scraper 등)는 `asyncio.get_event_loop().run_in_executor`로 래핑
+- 동기 라이브러리(google-play-scraper 등)는 `asyncio.get_running_loop()`로 래핑
+  - `get_event_loop()` 사용 금지 (Python 3.10+ deprecated)
 
 ```python
 # ✅ Good
 async def fetch_app_info(app_id: str) -> dict:
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, lambda: gps_app(app_id, lang="ko", country="kr"))
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(
+        None, lambda: gps_app(app_id, lang="ko", country="kr")
+    )
     return result
 ```
 
@@ -89,6 +93,13 @@ async def fetch_app_info(app_id: str) -> dict:
 # ✅ Good
 class AppAnalyzeRequest(BaseModel):
     app_id: str  # com.example.app 또는 Play Store URL
+
+class ScoreBreakdown(BaseModel):
+    avg_rating_score: float        # 평균 평점 기반 (0~100)
+    polarization_score: float      # ★1 + ★5 비율 (높을수록 의심)
+    negative_keyword_score: float  # "광고와 다름", "사기", "낚시" 등 키워드 빈도
+    review_ratio_score: float      # 설치수 대비 리뷰 수 (낮을수록 의심)
+    overall: float                 # 가중합 최종 점수 (0~100, 낮을수록 위험)
 
 class AnalyzeResponse(BaseModel):
     app_id: str
@@ -157,12 +168,13 @@ raise HTTPException(
       "genre": "도구"
     },
     "score_breakdown": {
-      "store_score": 78.4,
-      "permission_score": 70.0,
-      "keyword_score": 45.0,
-      "overall": 66.2
+      "avg_rating_score": 78.4,
+      "polarization_score": 45.0,
+      "negative_keyword_score": 30.0,
+      "review_ratio_score": 60.0,
+      "overall": 52.3
     },
-    "suspicious_keywords": ["무료", "선착순"],
+    "suspicious_keywords": ["광고와 다름", "사기", "낚시"],
     "verdict": "SUSPICIOUS"
   }
 }
@@ -174,6 +186,28 @@ raise HTTPException(
 | 70 이상 | `TRUSTED` |
 | 40 ~ 69 | `SUSPICIOUS` |
 | 39 이하 | `SCAM` |
+
+> **점수 방향**: overall이 낮을수록 위험. polarization_score와 negative_keyword_score는
+> 원본 수치가 높을수록 위험하므로 scorer.py에서 역산(100 - x) 후 가중합할 것.
+
+---
+
+## 점수 알고리즘 (scorer.py 구현 기준)
+
+| 시그널 | 데이터 소스 | 가중치 |
+|---|---|---|
+| avg_rating_score | `score` (0~5 → 0~100 선형 변환) | 25% |
+| polarization_score | `histogram` ★1+★5 합계 비율 역산 | 30% |
+| negative_keyword_score | 리뷰 텍스트 키워드 매칭 빈도 역산 | 30% |
+| review_ratio_score | `ratings / installs_numeric` 정규화 | 15% |
+
+**의심 키워드 목록 (`SUSPICIOUS_KEYWORDS`)**
+```python
+SUSPICIOUS_KEYWORDS = [
+    "광고와 다름", "광고랑 다름", "사기", "낚시", "다운받지 마",
+    "환불", "거짓", "속았", "다르다", "별로", "삭제"
+]
+```
 
 ---
 
@@ -188,6 +222,7 @@ raise HTTPException(
 
 - 해커톤 기간 중 단위 테스트 작성은 하지 않음
 - API 동작 확인은 **Swagger UI (`/docs`)로 수동 테스트**
+- 데모용 앱 ID 목록 (양산형 5 + 정상 5)은 `constants.py`에 고정해둘 것
 
 ---
 
@@ -248,6 +283,7 @@ app.add_middleware(
 - Docker / 컨테이너 환경 구성 (Railway가 알아서 처리)
 - 지금 당장 쓰이지 않는 코드 작성
 - 성능 최적화 (캐싱, 비동기 큐 등) — MVP 완성 후에 고민
+- `asyncio.get_event_loop()` 사용 (deprecated — `get_running_loop()` 사용)
 
 ### 우선순위 ✅
 1. `POST /api/analyze` 동작 여부
@@ -283,7 +319,6 @@ uvicorn main:app --reload --port 8000
 
 - 프론트엔드 레포: `team-frontend`
 - API 명세: Swagger (`/docs`) 또는 Notion 참고
-- 디자인 시안: Figma 링크 (추후 업데이트)
 - 문의: GitHub Issues 또는 Discord
 
 ## 성과 문서화
