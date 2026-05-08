@@ -48,7 +48,7 @@ async def analyze_app(request: AppAnalyzeRequest):
                 developer_id=app_info_data.get("developer_id", ""),
                 icon=app_info_data.get("icon", ""),
                 genre=app_info_data.get("genre", ""),
-                score=app_info_data.get("score") or 0.0,
+                score=round(app_info_data.get("score") or 0.0, 1),
                 ratings=app_info_data.get("ratings") or 0,
                 installs=app_info_data.get("installs") or "0",
             ),

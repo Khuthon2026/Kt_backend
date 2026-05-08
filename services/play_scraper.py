@@ -49,6 +49,8 @@ async def fetch_app_data(app_id: str) -> dict[str, Any]:
             detail={"code": "SCRAPING_FAILED", "message": "스크래핑 중 오류가 발생했습니다"},
         ) from exc
 
+    histogram = _normalize_histogram(app_result.get("histogram"))
+
     return {
         "app": {
             "title": app_result.get("title", ""),
@@ -61,9 +63,21 @@ async def fetch_app_data(app_id: str) -> dict[str, Any]:
             "genre": app_result.get("genre", ""),
             "icon": app_result.get("icon", ""),
         },
-        "histogram": app_result.get("histogram") or {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+        "histogram": histogram,
         "reviews": review_result or [],
     }
+
+
+def _normalize_histogram(raw: Any) -> dict[int, int]:
+    if isinstance(raw, dict):
+        return {int(k): int(v) for k, v in raw.items()}
+    if isinstance(raw, list):
+        # google-play-scraper may return a list ordered by 1..5 star counts
+        result = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for idx, count in enumerate(raw[:5], start=1):
+            result[idx] = int(count or 0)
+        return result
+    return {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
 
 
 async def fetch_search_results(query: str) -> list[dict[str, Any]]:
